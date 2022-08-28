@@ -1,54 +1,86 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {
+    public float speed;
+    public float rotationSpeed;
+    public float jumpSpeed;
 
-    public CharacterController controller;
+    private Animator animator;
+    private CharacterController characterController;
+    private float ySpeed;
+    private float originalStepOffset;
+    
+    private bool isJumping;
+    private bool isGrounded;
 
-    public float speed = 12f;
-    public float gravity = -9.81f;
 
-    public Transform groundCheck;
-    public float groundDistance = 0.4f;
-    public LayerMask groundMask;
-    public float jumpHeight = 3f;
-
-    Vector3 velocity;
-    bool isGrounded;
-
-    // Start is called before the first frame update
     void Start()
     {
-        
+        animator = GetComponent<Animator>();
+        characterController = GetComponent<CharacterController>();
+        originalStepOffset = characterController.stepOffset;
     }
 
-    // Update is called once per frame
     void Update()
     {
+        float horizontalInput = Input.GetAxis("Horizontal");
+        float verticalInput = Input.GetAxis("Vertical");
 
-        isGrounded = Physics.CheckSphere(groundCheck.position, groundDistance, groundMask);
+        Vector3 movementDirection = new Vector3(horizontalInput, 0, verticalInput);
+        float magnitude = Mathf.Clamp01(movementDirection.magnitude) * speed;
+        movementDirection.Normalize();
 
-        if(isGrounded && velocity.y < 0)
+        ySpeed += Physics.gravity.y * Time.deltaTime;
+
+        if (characterController.isGrounded)
         {
-            velocity.y = -9f;
+            characterController.stepOffset = originalStepOffset;
+            ySpeed = -0.5f;
+            animator.SetBool("IsGrounded", true);
+            isGrounded = true;
+            animator.SetBool("IsJumping", false);
+            isJumping = false;
+            animator.SetBool("IsFalling", false);
+
+            if (Input.GetButtonDown("Jump"))
+            {
+                ySpeed = jumpSpeed;
+                animator.SetBool("IsJumping", true);
+                isJumping = true;
+            }
         }
-        
-        float x = Input.GetAxis("Horizontal");
-        float z = Input.GetAxis("Vertical");
-
-        Vector3 move = transform.right * x + transform.forward * z;
-
-        if(Input.GetButtonDown("Jump") && isGrounded)
+        else
         {
-            velocity.y = Mathf.Sqrt(jumpHeight * -3f * gravity);
+            characterController.stepOffset = 0;
+            animator.SetBool("IsGrounded", false);
+            isGrounded = false;
+
+            if ((isJumping && ySpeed < 0) || ySpeed < -2)
+            {
+                animator.SetBool("IsFalling", true);
+            }
         }
 
-        controller.Move(move * speed * Time.deltaTime);
+        Vector3 velocity = movementDirection * magnitude;
+        velocity.y = ySpeed;
 
-        velocity.y += gravity * Time.deltaTime;
+        characterController.Move(velocity * Time.deltaTime);
 
-        controller.Move(velocity * Time.deltaTime);
+        if (movementDirection != Vector3.zero)
+        {
+            animator.SetBool("IsMoving", true);
+            Quaternion toRotation = Quaternion.LookRotation(movementDirection, Vector3.up);
+
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, toRotation, rotationSpeed * Time.deltaTime);
+        }
+        else
+        {
+            animator.SetBool("IsMoving", false);
+        }
     }
 }
+
+
+
+//Current
